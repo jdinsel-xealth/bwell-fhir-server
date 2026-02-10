@@ -35,6 +35,21 @@ class MockRedisClient {
         return this.store.get(key);
     }
 
+    /**
+     * Increment a key's value in redis
+     * @param {string} key
+     * @returns {Promise<number>} new value after increment
+     */
+    async incr(key) {
+        const storedValue = this.store.get(key);
+        const parsedCurrent =
+            storedValue === undefined ? 0 : parseInt(storedValue, 10);
+        const currentValue = Number.isNaN(parsedCurrent) ? 0 : parsedCurrent;
+        const newValue = currentValue + 1;
+        this.store.set(key, `${newValue}`);
+        return newValue;
+    }
+
     async deleteKey(key) {
         this.store.delete(key);
         this.streams.delete(key);

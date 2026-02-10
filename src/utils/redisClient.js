@@ -52,6 +52,10 @@ class RedisClient {
         return await this.client.get(key);
     }
 
+    async incr(key) {
+        return await this.client.incr(key);
+    }
+
     async set(key, value, ttlSeconds = null) {
         ttlSeconds = ttlSeconds || this.defaultTtlSeconds;
         if (ttlSeconds && !isNaN(parseInt(ttlSeconds))) {
@@ -164,9 +168,9 @@ class RedisClient {
     }
 
     /**
-     * Invalidates cache keys by prefix
+     * Retrieves all keys from Redis that match a given prefix
      * @param {string} prefix
-     * @returns {Promise<void>}
+     * @returns {Promise<string[]>}
      */
     async getAllKeysByPrefix(prefix) {
         const pattern = prefix + '*';

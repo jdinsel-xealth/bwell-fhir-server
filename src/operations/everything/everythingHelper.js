@@ -31,7 +31,8 @@ const {
     SUBSCRIPTION_RESOURCES_REFERENCE_SYSTEM,
     PERSON_PROXY_PREFIX,
     EVERYTHING_OP_NON_CLINICAL_RESOURCE_DEPTH,
-    HTTP_CONTEXT_KEYS
+    HTTP_CONTEXT_KEYS,
+    REGEX
 } = require('../../constants');
 const { SearchParametersManager } = require('../../searchParameters/searchParametersManager');
 const Resource = require('../../fhir/classes/4_0_0/resources/resource');
@@ -300,16 +301,21 @@ class EverythingHelper {
         if (isProxyPatient) {
             id = id.replace(PERSON_PROXY_PREFIX, '');
             if (isUuid(id) && id == requestInfo.personIdFromJwtToken) {
-                idForCache = `${PERSON_PROXY_PREFIX}${id}`;
+                idForCache = id;
             }
         } else {
             let patientIds = await this.fetchPatientUUID(parsedArgs, requestInfo, resourceType, base_version);
             idForCache = patientIds && patientIds.length == 1 ? patientIds[0] : undefined;
         }
 
-        return idForCache ? keyGenerator.generateCacheKey(
-            { id: idForCache, parsedArgs: parsedArgs, scope: requestInfo.scope }
-        ) : undefined;
+        return idForCache
+            ? await keyGenerator.generateCacheKey({
+                  id: idForCache,
+                  isPersonId: isProxyPatient,
+                  parsedArgs: parsedArgs,
+                  scope: requestInfo.scope
+              })
+            : undefined;
     }
 
     /**
@@ -434,7 +440,10 @@ class EverythingHelper {
                      */
                     let proxyPatientIds = []
                     if (resourceType === 'Patient') {
-                        proxyPatientIds = idChunk.filter((q) => q && q.startsWith(PERSON_PROXY_PREFIX));
+                        proxyPatientIds = idChunk.filter(
+                            // starts with proxy patient prefix and followed by valid id characters
+                            (q) => q && q.startsWith(PERSON_PROXY_PREFIX) && REGEX.ID_FIELD.test(q)
+                        );
 
                         // filter proxy patient ids to only include allowed ids for patient scope
                         if (requestInfo.isUser) {

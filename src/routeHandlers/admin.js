@@ -10,7 +10,7 @@ const OperationOutcomeIssue = require('../fhir/classes/4_0_0/backbone_elements/o
 const { assertIsValid } = require('../utils/assertType');
 const { generateUUID } = require('../utils/uid.util');
 const { logInfo } = require('../operations/common/logging');
-const { REQUEST_ID_HEADER } = require('../constants');
+const { REQUEST_ID_HEADER, REGEX } = require('../constants');
 const { AdminExportManager } = require('../admin/adminExportManager');
 const { logError } = require('../operations/common/logging');
 
@@ -114,6 +114,12 @@ async function handleAdminGet (
                     logInfo('', { 'req.query': req.query });
                     const id = req.query.id;
                     if (id) {
+                        // Validate that id is a string, not an object
+                        if (typeof id !== 'string' || REGEX.ID_FIELD.test(id) === false) {
+                            return res.status(400).json({
+                                message: 'Invalid id parameter'
+                            });
+                        }
                         const adminLogManager = new AdminLogManager({ mongoDatabaseManager: container.mongoDatabaseManager });
                         const json = await adminLogManager.getLogAsync(id);
                         return res.json(json);
@@ -201,11 +207,11 @@ async function handleAdminGet (
                     if (resourceType && resourceId) {
                         const fhirCacheKeyManager = container.fhirCacheKeyManager;
                         try {
-                            const cacheKeys = await fhirCacheKeyManager.getAllKeysForResource({
+                            const result = await fhirCacheKeyManager.getAllKeysForResource({
                                 resourceType,
                                 resourceId
                             });
-                            return res.json({ cacheKeys: cacheKeys });
+                            return res.json(result);
                         } catch (error) {
                             logError(`Error retrieving cache for ${resourceType}/${resourceId}`, error);
                             const operationOutcome = new OperationOutcome({
