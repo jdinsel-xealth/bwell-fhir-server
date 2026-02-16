@@ -4,6 +4,7 @@ const httpContext = require('express-http-context');
 const accepts = require('accepts');
 const { REQUEST_ID_TYPE } = require('../constants');
 const { FhirRequestInfo } = require('./fhirRequestInfo');
+const { logError } = require('../operations/common/logging');
 
 /**
  * Builder class for constructing FhirRequestInfo instances from HTTP requests
@@ -70,9 +71,24 @@ class FhirRequestInfoBuilder {
         const protocol = this.req.protocol;
 
         // Add port if protocol is not https and port exists
-        if (protocol !== 'https' && this.req.headers.host && this.req.headers.host.includes(':')) {
-            const port = this.req.headers.host.split(':')[1];
-            host = `${this.req.hostname}:${port}`;
+        if (protocol !== 'https' && this.req.headers.host) {
+            try {
+                const url = new URL(`${protocol}://${this.req.headers.host}`);
+                if (url.port) {
+                    host = `${this.req.hostname}:${url.port}`;
+                }
+            } catch (err) {
+               logError(
+                    `hostName: Invalid host header, unable to parse port ${this.req.headers.host}`,
+                    {
+                        args: {
+                            error: err.message,
+                            source: 'fhirRequestInfoBuilder',
+                            requestId: httpContext.get(REQUEST_ID_TYPE.SYSTEM_GENERATED_REQUEST_ID)
+                        }
+                    }
+                );
+            }
         }
 
         return host;
