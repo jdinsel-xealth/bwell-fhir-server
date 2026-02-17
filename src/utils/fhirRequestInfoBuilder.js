@@ -98,7 +98,7 @@ class FhirRequestInfoBuilder {
      * Alternate user ID.
      * For patient scoped token, returns the sub from token else same as user.
      */
-    get alternatedUserId() {
+    get alternateUserId() {
         return this.isUser ? this.req.authInfo?.context?.subject : this.extractUser();
     }
 
@@ -112,7 +112,7 @@ class FhirRequestInfoBuilder {
 
         return new FhirRequestInfo({
             user: this.extractUser(),
-            alternatedUserId: this.alternatedUserId,
+            alternateUserId: this.alternateUserId,
             scope: this.req.authInfo?.scope,
             remoteIpAddress: this.req.socket.remoteAddress,
             requestId: httpContext.get(REQUEST_ID_TYPE.SYSTEM_GENERATED_REQUEST_ID) || this.req.requestId,

@@ -126,7 +126,7 @@ class AuditLogger {
         /**
          * @type {string|null}
          */
-        const alternateId = requestInfo.alternatedUserId;
+        const alternateId = requestInfo.alternateUserId;
 
         if (isPatient) {
             actorReference = `Patient/person.${requestInfo.user}`;
