@@ -97,6 +97,7 @@ class FhirRequestInfoBuilder {
     /**
      * Alternate user ID.
      * For patient scoped token, returns the sub from token else same as user.
+     * @returns {string | null}
      */
     get alternateUserId() {
         return this.isUser ? this.req.authInfo?.context?.subject : this.extractUser();

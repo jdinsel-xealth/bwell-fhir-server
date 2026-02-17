@@ -21,6 +21,7 @@ const { Mutex } = require('async-mutex');
 const { PreSaveManager } = require('../preSaveHandlers/preSave');
 const { AuditEventKafkaProducer } = require('./auditEventKafkaProducer');
 const { ConfigManager } = require('./configManager');
+const { PERSON_PROXY_PREFIX } = require('../constants');
 const mutex = new Mutex();
 
 class AuditLogger {
@@ -117,7 +118,7 @@ class AuditLogger {
         // Get current record
         const maxIds = maxNumberOfIds !== undefined ? maxNumberOfIds : this.maxIdsPerAuditEvent;
 
-        const isPatient = Boolean(requestInfo?.isPatient);
+        const isUser = Boolean(requestInfo?.isUser);
 
         /**
          * @type {string}
@@ -128,8 +129,8 @@ class AuditLogger {
          */
         const alternateId = requestInfo.alternateUserId;
 
-        if (isPatient) {
-            actorReference = `Patient/person.${requestInfo.user}`;
+        if (isUser) {
+            actorReference = `Patient/${PERSON_PROXY_PREFIX}${requestInfo.user}`;
         } else {
             actorReference = `Person/${requestInfo.user}`;
         }
