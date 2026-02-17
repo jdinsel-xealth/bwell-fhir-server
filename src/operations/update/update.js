@@ -1,6 +1,6 @@
 const httpContext = require('express-http-context');
 const moment = require('moment-timezone');
-const { NotValidatedError, BadRequestError } = require('../../utils/httpErrors');
+const { NotValidatedError, BadRequestError, PreconditionFailedError } = require('../../utils/httpErrors');
 const { assertTypeEquals, assertIsValid } = require('../../utils/assertType');
 const { AuditLogger } = require('../../utils/auditLogger');
 const { PostRequestProcessor } = require('../../utils/postRequestProcessor');
@@ -12,6 +12,7 @@ const { DatabaseBulkInserter } = require('../../dataLayer/databaseBulkInserter')
 const { SecurityTagSystem } = require('../../utils/securityTagSystem');
 const { ResourceMerger } = require('../common/resourceMerger');
 const { getCircularReplacer } = require('../../utils/getCircularReplacer');
+const { logInfo } = require('../common/logging');
 const { ParsedArgs } = require('../query/parsedArgs');
 const { ConfigManager } = require('../../utils/configManager');
 const { FhirResourceCreator } = require('../../fhir/fhirResourceCreator');
@@ -297,6 +298,9 @@ class UpdateOperation {
             let updatedResource;
             let patches;
 
+            const ifMatch = requestInfo.headers && requestInfo.headers['if-match'];
+            let precondition_failed_error;
+
             // check if resource was found in database or not
             // noinspection JSUnresolvedVariable
             if (data && data.meta) {
@@ -305,7 +309,23 @@ class UpdateOperation {
                 await this.scopesValidator.isAccessToResourceAllowedByAccessAndPatientScopes({
                     requestInfo, resource: foundResource, base_version
                 });
-
+                // If-Match/version check logic (optimistic locking)
+                if (ifMatch) {
+                    if (data.meta.versionId) {
+                        const normalizeETag = (etag) => (etag || '').replace(/^W\//, '').replace(/"/g, '');
+                        const versionIds = ifMatch.split(',').map(v => normalizeETag(v.trim()));
+                        const currentVersionId = normalizeETag(String(data.meta.versionId));
+                        if (!versionIds.includes(currentVersionId) && !versionIds.includes('*')) {
+                            precondition_failed_error = new PreconditionFailedError(`Version conflict: If-Match does not match current resource version. Older version: ${currentVersionId}, If-Match: ${ifMatch}`);
+                            logInfo(precondition_failed_error.message);
+                            throw precondition_failed_error;
+                        }
+                    } else {
+                        precondition_failed_error = new PreconditionFailedError(`Version conflict: Resource does not have a versionId, but If-Match header was provided. If-Match: ${ifMatch}`);
+                        logInfo(precondition_failed_error.message);
+                        throw precondition_failed_error;
+                    }
+                }
                 ({ updatedResource, patches } = await this.resourceMerger.mergeResourceAsync({
                     base_version,
                     requestInfo,
@@ -316,7 +336,12 @@ class UpdateOperation {
                 }));
                 doc = updatedResource;
             } else {
-                doc = resource_incoming
+                if (ifMatch) {
+                    precondition_failed_error = new PreconditionFailedError(`Version conflict: Resource does not exist, but If-Match header was provided. If-Match: ${ifMatch}`);
+                    logInfo(precondition_failed_error.message);
+                    throw precondition_failed_error;
+                }
+                doc = resource_incoming;
             }
             if (doc) {
                 // Validating resource meta tags
