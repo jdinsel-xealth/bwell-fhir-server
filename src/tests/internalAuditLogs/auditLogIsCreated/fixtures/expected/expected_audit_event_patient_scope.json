@@ -52,10 +52,11 @@
                 "_uuid": "Person/0b2ad38a-20bc-5cf5-9739-13f242b05892",
                 "_sourceId": "Person/person1"
             },
-            "altId": "person1",
+            "altId": "unique-identifier-123",
             "requestor": true,
             "network": {
-                "type": "2"
+                "type": "2",
+                "address": "::ffff:127.0.0.1"
             }
         }
     ],
