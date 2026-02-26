@@ -1,5 +1,6 @@
 const {isTrue} = require('./isTrue');
 const {DEFAULT_CACHE_EXPIRY_TIME} = require('../constants');
+const { readSecret } = require('./secretReader');
 
 const env = process.env;
 
@@ -137,7 +138,7 @@ class ConfigManager {
      * @return {string|null}
      */
     get kafkaUserName() {
-        return env.KAFKA_SASL_USERNAME || null;
+        return readSecret('KAFKA_SASL_USERNAME') || null;
     }
 
     /**
@@ -145,7 +146,7 @@ class ConfigManager {
      * @return {string|null}
      */
     get kafkaPassword() {
-        return env.KAFKA_SASL_PASSWORD || null;
+        return readSecret('KAFKA_SASL_PASSWORD') || null;
     }
 
     /**

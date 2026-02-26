@@ -63,7 +63,7 @@ https://auth0.com/docs/get-started/apis/scopes/openid-connect-scopes
 This FHIR server supports three types of authentication:
 
 #### 2.4.1 Service to Service Auth
-This is used by a service to talk to the FHIR server. 
+This is used by a service to talk to the FHIR server.
 
 This uses the OAuth Client Credentials workflow (https://www.oauth.com/oauth2-servers/access-tokens/client-credentials/).
 
@@ -398,3 +398,197 @@ For authentication following credentials can be used, which can be configured fr
 For admin account: `admin` & `password`
 
 For patient account: `patient` & `password`
+
+## Kubernetes Secret Management (SecretProviderClass / CSI Driver)
+
+Storing database credentials and other sensitive values directly in Kubernetes `Secret` objects is insecure because those values are persisted in etcd in base64-encoded (not encrypted) form by default.  This FHIR server supports the **`_FILE` env var convention** so that secrets can instead be loaded at runtime from files mounted by the [Secrets Store CSI Driver](https://secrets-store-csi-driver.sigs.k8s.io/) (e.g. backed by AWS Secrets Manager, HashiCorp Vault, or Azure Key Vault).
+
+### How it works
+
+For every sensitive environment variable (e.g. `MONGO_USERNAME`), the server checks whether a companion `_FILE` variable is set (e.g. `MONGO_USERNAME_FILE`).  If it is, the secret is read from that filesystem path at startup.  If not, the direct env var value is used as before — making this **fully backward-compatible**.
+
+The resolution lives in [`src/utils/secretReader.js`](../src/utils/secretReader.js).
+
+### Supported `_FILE` variables
+
+| Direct env var | `_FILE` variant |
+|---|---|
+| `MONGO_USERNAME` | `MONGO_USERNAME_FILE` |
+| `MONGO_PASSWORD` | `MONGO_PASSWORD_FILE` |
+| `AUDIT_EVENT_MONGO_USERNAME` | `AUDIT_EVENT_MONGO_USERNAME_FILE` |
+| `AUDIT_EVENT_MONGO_PASSWORD` | `AUDIT_EVENT_MONGO_PASSWORD_FILE` |
+| `ACCESS_LOGS_MONGO_USERNAME` | `ACCESS_LOGS_MONGO_USERNAME_FILE` |
+| `ACCESS_LOGS_MONGO_PASSWORD` | `ACCESS_LOGS_MONGO_PASSWORD_FILE` |
+| `RESOURCE_HISTORY_MONGO_USERNAME` | `RESOURCE_HISTORY_MONGO_USERNAME_FILE` |
+| `RESOURCE_HISTORY_MONGO_PASSWORD` | `RESOURCE_HISTORY_MONGO_PASSWORD_FILE` |
+| `KAFKA_SASL_USERNAME` | `KAFKA_SASL_USERNAME_FILE` |
+| `KAFKA_SASL_PASSWORD` | `KAFKA_SASL_PASSWORD_FILE` |
+
+### Example: AWS Secrets Manager via SecretProviderClass
+
+#### 1. SecretProviderClass resource
+
+```yaml
+apiVersion: secrets-store.csi.x-k8s.io/v1
+kind: SecretProviderClass
+metadata:
+  name: fhir-server-secrets
+  namespace: fhir-server-production
+spec:
+  provider: aws
+  parameters:
+    objects: |
+      - objectName: "fhir-server/mongo-username"
+        objectType: "secretsmanager"
+        objectAlias: "mongo-username"
+      - objectName: "fhir-server/mongo-password"
+        objectType: "secretsmanager"
+        objectAlias: "mongo-password"
+      - objectName: "fhir-server/kafka-sasl-username"
+        objectType: "secretsmanager"
+        objectAlias: "kafka-sasl-username"
+      - objectName: "fhir-server/kafka-sasl-password"
+        objectType: "secretsmanager"
+        objectAlias: "kafka-sasl-password"
+```
+
+#### 2. Pod spec — volume mount and env vars
+
+```yaml
+spec:
+  volumes:
+    - name: secrets-store
+      csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: fhir-server-secrets
+
+  containers:
+    - name: fhir-server
+      # ...
+      volumeMounts:
+        - name: secrets-store
+          mountPath: /mnt/secrets
+          readOnly: true
+      env:
+        # Point each _FILE var at the CSI-mounted file.
+        # The path values are non-sensitive and safe to store as plain env vars.
+        - name: MONGO_USERNAME_FILE
+          value: /mnt/secrets/mongo-username
+        - name: MONGO_PASSWORD_FILE
+          value: /mnt/secrets/mongo-password
+        - name: KAFKA_SASL_USERNAME_FILE
+          value: /mnt/secrets/kafka-sasl-username
+        - name: KAFKA_SASL_PASSWORD_FILE
+          value: /mnt/secrets/kafka-sasl-password
+        # Non-sensitive vars remain as plain env vars.
+        - name: MONGO_URL
+          value: mongodb+srv://cluster.example.com
+        # ...
+```
+
+With this setup no credential ever appears in etcd; the CSI driver fetches values from Secrets Manager at Pod start time and makes them available as files on the Pod's filesystem.
+
+### Example: HashiCorp Vault via SecretProviderClass
+
+Requires the [Vault CSI provider](https://developer.hashicorp.com/vault/docs/platform/k8s/csi) to be installed in the cluster.
+
+#### 1. SecretProviderClass resource
+
+```yaml
+apiVersion: secrets-store.csi.x-k8s.io/v1
+kind: SecretProviderClass
+metadata:
+  name: fhir-server-secrets
+  namespace: fhir-server-production
+spec:
+  provider: vault
+  parameters:
+    vaultAddress: "https://vault.example.com"
+    # Vault Kubernetes auth role that has read access to the paths below.
+    roleName: "fhir-server"
+    objects: |
+      - objectName: "mongo-username"
+        secretPath: "secret/data/fhir-server/mongo"
+        secretKey: "username"
+      - objectName: "mongo-password"
+        secretPath: "secret/data/fhir-server/mongo"
+        secretKey: "password"
+      - objectName: "kafka-sasl-username"
+        secretPath: "secret/data/fhir-server/kafka"
+        secretKey: "username"
+      - objectName: "kafka-sasl-password"
+        secretPath: "secret/data/fhir-server/kafka"
+        secretKey: "password"
+```
+
+#### 2. Pod spec — volume mount and env vars
+
+The Pod spec is identical to the AWS example above. The CSI driver mounts each `objectName` as a file at the `mountPath`; only the file path env vars need to be set:
+
+```yaml
+env:
+  - name: MONGO_USERNAME_FILE
+    value: /mnt/secrets/mongo-username
+  - name: MONGO_PASSWORD_FILE
+    value: /mnt/secrets/mongo-password
+  - name: KAFKA_SASL_USERNAME_FILE
+    value: /mnt/secrets/kafka-sasl-username
+  - name: KAFKA_SASL_PASSWORD_FILE
+    value: /mnt/secrets/kafka-sasl-password
+volumeMounts:
+  - name: secrets-store
+    mountPath: /mnt/secrets
+    readOnly: true
+volumes:
+  - name: secrets-store
+    csi:
+      driver: secrets-store.csi.k8s.io
+      readOnly: true
+      volumeAttributes:
+        secretProviderClass: fhir-server-secrets
+```
+
+### Example: Azure Key Vault via SecretProviderClass
+
+Requires the [Azure Key Vault provider](https://azure.github.io/secrets-store-csi-driver-provider-azure/) and a managed identity (Workload Identity or pod identity) with `get` permission on the secrets.
+
+#### 1. SecretProviderClass resource
+
+```yaml
+apiVersion: secrets-store.csi.x-k8s.io/v1
+kind: SecretProviderClass
+metadata:
+  name: fhir-server-secrets
+  namespace: fhir-server-production
+spec:
+  provider: azure
+  parameters:
+    usePodIdentity: "false"
+    clientID: "<managed-identity-client-id>"   # Workload Identity client ID
+    keyvaultName: "fhir-server-kv"
+    tenantId: "<azure-tenant-id>"
+    objects: |
+      array:
+        - |
+          objectName: mongo-username
+          objectType: secret
+          objectAlias: mongo-username
+        - |
+          objectName: mongo-password
+          objectType: secret
+          objectAlias: mongo-password
+        - |
+          objectName: kafka-sasl-username
+          objectType: secret
+          objectAlias: kafka-sasl-username
+        - |
+          objectName: kafka-sasl-password
+          objectType: secret
+          objectAlias: kafka-sasl-password
+```
+
+#### 2. Pod spec — volume mount and env vars
+
+Same structure as the AWS and Vault examples — only the `SecretProviderClass` spec above differs per cloud provider. Use the same `volumeMounts`, `volumes`, and `env` block as shown in the Vault example.

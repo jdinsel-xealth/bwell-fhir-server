@@ -4,17 +4,18 @@
 const Sentry = require('@sentry/node');
 const { profiles } = require('./profiles');
 const { getQueryParams } = require('./utils/getQueryParams');
+const { readSecret } = require('./utils/secretReader');
 
 const env = process.env;
 let mongoUrl = env.MONGO_URL || `mongodb://${env.MONGO_HOSTNAME}:${env.MONGO_PORT}`;
-if (env.MONGO_USERNAME !== undefined) {
+if (readSecret('MONGO_USERNAME') !== undefined) {
     mongoUrl = mongoUrl.replace(
         'mongodb://',
-        `mongodb://${env.MONGO_USERNAME}:${env.MONGO_PASSWORD}@`
+        `mongodb://${readSecret('MONGO_USERNAME')}:${readSecret('MONGO_PASSWORD')}@`
     );
     mongoUrl = mongoUrl.replace(
         'mongodb+srv://',
-        `mongodb+srv://${env.MONGO_USERNAME}:${env.MONGO_PASSWORD}@`
+        `mongodb+srv://${readSecret('MONGO_USERNAME')}:${readSecret('MONGO_PASSWORD')}@`
     );
 }
 // url-encode the url
@@ -67,14 +68,14 @@ let auditEventMongoConfig = {
 };
 if (env.AUDIT_EVENT_MONGO_URL) {
     let auditEventMongoUrl = env.AUDIT_EVENT_MONGO_URL;
-    if (env.AUDIT_EVENT_MONGO_USERNAME !== undefined) {
+    if (readSecret('AUDIT_EVENT_MONGO_USERNAME') !== undefined) {
         auditEventMongoUrl = auditEventMongoUrl.replace(
             'mongodb://',
-            `mongodb://${env.AUDIT_EVENT_MONGO_USERNAME}:${env.AUDIT_EVENT_MONGO_PASSWORD}@`
+            `mongodb://${readSecret('AUDIT_EVENT_MONGO_USERNAME')}:${readSecret('AUDIT_EVENT_MONGO_PASSWORD')}@`
         );
         auditEventMongoUrl = auditEventMongoUrl.replace(
             'mongodb+srv://',
-            `mongodb+srv://${env.AUDIT_EVENT_MONGO_USERNAME}:${env.AUDIT_EVENT_MONGO_PASSWORD}@`
+            `mongodb+srv://${readSecret('AUDIT_EVENT_MONGO_USERNAME')}:${readSecret('AUDIT_EVENT_MONGO_PASSWORD')}@`
         );
     }
 // url-encode the url
@@ -107,10 +108,10 @@ let auditEventReadOnlyMongoConfig = {
 };
 if (env.AUDIT_EVENT_ONLINE_ARCHIVE_CLUSTER_MONGO_URL) {
     let auditEventReadOnlyMongoUrl = env.AUDIT_EVENT_ONLINE_ARCHIVE_CLUSTER_MONGO_URL;
-    if (env.AUDIT_EVENT_MONGO_USERNAME !== undefined) {
+    if (readSecret('AUDIT_EVENT_MONGO_USERNAME') !== undefined) {
         auditEventReadOnlyMongoUrl = auditEventReadOnlyMongoUrl.replace(
             'mongodb://',
-            `mongodb://${env.AUDIT_EVENT_MONGO_USERNAME}:${env.AUDIT_EVENT_MONGO_PASSWORD}@`
+            `mongodb://${readSecret('AUDIT_EVENT_MONGO_USERNAME')}:${readSecret('AUDIT_EVENT_MONGO_PASSWORD')}@`
         );
     }
     // url-encode the url
@@ -143,14 +144,14 @@ let accessLogsMongoConfig = {
 };
 if (env.ACCESS_LOGS_CLUSTER_MONGO_URL) {
     let accessLogsMongoUrl = env.ACCESS_LOGS_CLUSTER_MONGO_URL;
-    if (env.ACCESS_LOGS_MONGO_USERNAME !== undefined) {
+    if (readSecret('ACCESS_LOGS_MONGO_USERNAME') !== undefined) {
         accessLogsMongoUrl = accessLogsMongoUrl.replace(
             'mongodb://',
-            `mongodb://${env.ACCESS_LOGS_MONGO_USERNAME}:${env.ACCESS_LOGS_MONGO_PASSWORD}@`
+            `mongodb://${readSecret('ACCESS_LOGS_MONGO_USERNAME')}:${readSecret('ACCESS_LOGS_MONGO_PASSWORD')}@`
         );
         accessLogsMongoUrl = accessLogsMongoUrl.replace(
             'mongodb+srv://',
-            `mongodb+srv://${env.ACCESS_LOGS_MONGO_USERNAME}:${env.ACCESS_LOGS_MONGO_PASSWORD}@`
+            `mongodb+srv://${readSecret('ACCESS_LOGS_MONGO_USERNAME')}:${readSecret('ACCESS_LOGS_MONGO_PASSWORD')}@`
         );
     }
     // url-encode the url
@@ -185,14 +186,14 @@ let resourceHistoryMongoConfig = {
 };
 if (env.RESOURCE_HISTORY_MONGO_URL) {
     let resourceHistoryMongoUrl = env.RESOURCE_HISTORY_MONGO_URL;
-    if (env.RESOURCE_HISTORY_MONGO_USERNAME !== undefined) {
+    if (readSecret('RESOURCE_HISTORY_MONGO_USERNAME') !== undefined) {
         resourceHistoryMongoUrl = resourceHistoryMongoUrl.replace(
             'mongodb://',
-            `mongodb://${env.RESOURCE_HISTORY_MONGO_USERNAME}:${env.RESOURCE_HISTORY_MONGO_PASSWORD}@`
+            `mongodb://${readSecret('RESOURCE_HISTORY_MONGO_USERNAME')}:${readSecret('RESOURCE_HISTORY_MONGO_PASSWORD')}@`
         );
         resourceHistoryMongoUrl = resourceHistoryMongoUrl.replace(
             'mongodb+srv://',
-            `mongodb+srv://${env.RESOURCE_HISTORY_MONGO_USERNAME}:${env.RESOURCE_HISTORY_MONGO_PASSWORD}@`
+            `mongodb+srv://${readSecret('RESOURCE_HISTORY_MONGO_USERNAME')}:${readSecret('RESOURCE_HISTORY_MONGO_PASSWORD')}@`
         );
     }
 // url-encode the url
