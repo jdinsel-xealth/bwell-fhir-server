@@ -40,6 +40,16 @@ function readSecret (varName) {
     const filePath = process.env[`${varName}_FILE`];
 
     if (filePath !== undefined) {
+        if (filePath === '') {
+            const { logError } = require('../operations/common/logging');
+            const msg = `secretReader: '${varName}_FILE' is set to an empty string. Provide a valid file path or unset the variable.`;
+            logError(msg, {});
+            throw new RethrownError({
+                message: msg,
+                source: 'secretReader.readSecret',
+                error: new Error(msg)
+            });
+        }
         try {
             return fs.readFileSync(filePath, 'utf8').trim();
         } catch (error) {

@@ -94,5 +94,9 @@ describe('secretReader Tests', () => {
             expect(() => readSecret(TEST_VAR)).toThrow();
             expect(() => readSecret(TEST_VAR)).toThrow(/failed to read secret from file/i);
         });
-    });
+        test('throws with a clear message when _FILE env var is set to an empty string', () => {
+            process.env[TEST_VAR_FILE] = '';
+
+            expect(() => readSecret(TEST_VAR)).toThrow(/empty string/i);
+        });    });
 });
